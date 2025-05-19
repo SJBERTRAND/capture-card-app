@@ -1,0 +1,208 @@
+#! /bin/gjs -m
+
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
+import Gst from 'gi://Gst';
+import Gtk from 'gi://Gtk?version=4.0';
+//import Adw from 'gi://Adw';
+import GObject from 'gi://GObject';
+
+
+// Create a constructor for the app
+const VideoCaptureCard = class{
+		constructor(){
+		};
+        
+        Create_Window(app){
+            //Get the Deffault Settings for Gtk
+            const AppSettings=Gtk.Settings.get_default();
+            //Set the app property
+            AppSettings.set_property("gtk_application_prefer_dark_theme", true);
+            //Create Main Window
+            const win = new Gtk.ApplicationWindow({
+                application: app,
+                title: "Video Capture Card App",
+                default_width: 320,
+                //default_height: 480,
+                resizable: false,
+                //show_menubar: true,
+            });
+            const Grid = this.CreateGrid();
+            const SourceLabel = this.CreateLabel("Select Video Source");
+            
+            // Create device list
+            const Devices = this.Get_webcams_list();
+            
+            const DropMenu = this.Create_Drop_Down();
+            
+            const StartButton = this.Create_Button("Start");
+
+            const StopButton = this.Create_Button("Stop");
+            
+            // Add the two toggle to the same group so only one can be active
+            StartButton.set_group(StopButton);
+            // Default the stop as active when window is created
+            StopButton.set_active(true);
+
+            // Create a pipeline object 
+            let pipeline;
+            
+            StartButton.connect('toggled', () => {
+                if ( StartButton.active ) {
+                    let devicepath = this.Get_device_path(Devices[DropMenu.get_selected()]);
+                    // Now build a pipeline function
+                    pipeline = this.Create_pipeline(devicepath)                
+                    // Start the player
+                    pipeline.set_state(4);
+                    // Freeze the drop down when active
+                    DropMenu.set_sensitive(false); 
+                };
+            });
+            
+            StopButton.connect('toggled', () => {
+                if ( StopButton.active ) {
+                    pipeline.set_state(1);
+                    // Un Freeze the drop down when clicked
+                    DropMenu.set_sensitive(true);
+                };
+            });
+                        
+            // Attach all widgets to the window
+            
+            Grid.attach(SourceLabel,0,0,2,1);
+            Grid.attach(DropMenu,0,1,2,1);
+            Grid.attach(StartButton,0,2,1,1);
+            Grid.attach(StopButton,1,2,1,1);
+            
+            //Attach Grid ot window
+            win.child = Grid;
+            //Present main window
+            win.present();
+        };
+        
+        
+        CreateGrid(){
+            const Grid = new Gtk.Grid({
+                margin_bottom: 25,
+                margin_end: 25,
+                margin_start: 25,
+                margin_top: 25,
+                valign: 1,
+                baseline_row: 0,
+                column_homogeneous: true,
+                column_spacing: 10,
+                row_homogeneous: true,
+                row_spacing: 10,               
+            });
+            return Grid;
+        };
+        
+        CreateLabel(text){
+            const Label = new Gtk.Label({
+                label: text,
+            });
+            return Label;
+        };
+        
+        Create_Drop_Down(){
+            
+            // Create the list
+            const stringlist = new Gtk.StringList();
+            //Create the drop down
+            const Drop_Down = new Gtk.DropDown({
+                model: stringlist,
+                show_arrow: true,
+            });
+            // Obtain list of Camera and add them to the list
+            const camlist = this.Get_webcams_list();
+             camlist.forEach(device => {
+                stringlist.append(device.get_display_name());
+             });
+             
+            //return listbox;
+            return Drop_Down;
+        };
+        
+        Create_Button(label){
+            const toggle_button = new Gtk.ToggleButton ({
+                label: label,
+            });         
+            return toggle_button   
+        };
+        
+        
+        Get_webcams_list(){
+            //Create a device monitor
+            const deviceMonitor = new Gst.DeviceMonitor({
+            });
+            // Filter for video capture devices
+            deviceMonitor.add_filter(null,Gst.Caps.from_string("video/x-raw"));
+            //Start the monitoring
+            deviceMonitor.start();
+            // Create an array for all the devices
+            const devices = deviceMonitor.get_devices();
+            //Stop the monitoring
+            deviceMonitor.stop();
+            //Return the array
+            return devices;
+        };
+        
+        Get_device_path(device){
+            const device_path = device.get_properties().get_value('api.v4l2.path');
+            return device_path;
+        };
+        
+        Get_device_name(device){
+            const device_name = device.get_properties().get_value('api.v4l2.cap.card');
+            return device_name;
+        };
+        
+        
+        Create_pipeline(devicepath){
+            //Create the pipeline
+            const pipeline = Gst.Pipeline.new('App Pipeline');
+            //Create the source for the pipeline
+            const src = Gst.ElementFactory.make('v4l2src', 'source');
+            //Set the device path to the src
+            src.set_property('device', devicepath);
+            // Add the source to the pipeline
+            pipeline.add(src);
+            //Create the conveter
+            const converter = Gst.ElementFactory.make('jpegdec', 'converter');
+            // Add the converter to the pipeline
+            pipeline.add(converter);
+            //Create the sink
+            //const sink = Gst.ElementFactory.make('xvimagesink', 'sink');
+            const sink = Gst.ElementFactory.make('autovideosink', 'sink');
+            // Add the sink to the pipeline
+            pipeline.add(sink);
+            // Link the elements together
+            src.link(converter);
+            converter.link(sink);
+            
+            // Return the constructed pipeline
+            return pipeline;            
+        };
+
+}; // End of Video capture Card
+
+
+// Create a new application
+let app = new Gtk.Application({ application_id: 'org.videocapturecard.local' });
+
+// What to do when the app is open
+app.connect('activate', () => {
+    // Initialize Gst Streamer
+    Gst.init(ARGV);
+    
+    // Call the constructor
+    const VCC = new VideoCaptureCard({
+    });
+    VCC.Create_Window(app);
+    
+    // I could use the device monitor and have it running to add or remove device from the list
+
+}); //End of app connect
+
+//Run the app
+app.run(ARGV);

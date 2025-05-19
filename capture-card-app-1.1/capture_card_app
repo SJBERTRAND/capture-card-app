@@ -1,0 +1,210 @@
+#! /bin/python3
+
+import sys
+import gi
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gtk
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+from gi.repository import GLib
+from gi.repository import Gio
+from gi.repository import GObject
+
+
+class video_capture_card:
+    # The app will be create in main and pass as an argument
+    def __init__(self, app, pipeline):
+        self.app = app
+        self.pipeline = pipeline
+
+    def create_window(self,app):
+        # Get the default settings for GTK
+        app_settings = Gtk.Settings.get_default()
+        #Set the app property
+        app_settings.set_property("gtk_application_prefer_dark_theme", True)
+        # Create the main window
+        win = Gtk.ApplicationWindow(
+            application=app,
+            title="Video Capture Card App",
+            default_width=320,
+            resizable=False
+            )
+        # Create the grid
+        app_grid = self.create_grid()
+        # Create the label
+        app_label = self.create_label("Select Video Source")
+
+        # Create device list
+        app_devices = self.create_device_list()
+        # Create a dropdown
+        app_drop_down = self.create_drop_down()
+        # Create start button
+        app_start_button = self.create_button("Start")
+        # Create stop button
+        app_stop_button = self.create_button("Stop")
+
+        # Add the two toggle to the same group
+        app_start_button.set_group(app_stop_button)
+        # Default the stop active when the window is created
+        app_stop_button.set_active(True)
+
+        # Attach the drop_down to the start button drop_down value
+        app_start_button.drop_down = app_drop_down
+        # Attach the app_devices to the start button devices value
+        app_start_button.devices = app_devices
+        # Create the signal toggle on the start button
+        app_start_button.connect("toggled",self.toggle_start)
+
+
+        # Attach the drop_down to the start button drop_down value
+        app_stop_button.drop_down = app_drop_down
+        # Create the signal toggle on the stop button
+        app_stop_button.connect("toggled",self.toggle_stop)
+
+        # Attach all element to the grid
+        app_grid.attach(app_label,0,0,2,1)
+        app_grid.attach(app_drop_down,0,1,2,1)
+        app_grid.attach(app_start_button,0,2,1,1)
+        app_grid.attach(app_stop_button,1,2,1,1)
+        # Attach grid to window
+        win.set_child(app_grid)
+        # Present the window
+        win.present()
+
+##### End of create window #####
+
+
+    def create_grid(self):
+        app_grid = Gtk.Grid(
+            margin_bottom=25,
+            margin_end=25,
+            margin_start=25,
+            margin_top=25,
+            valign=1,
+            baseline_row=0,
+            column_homogeneous=True,
+            column_spacing=10,
+            row_homogeneous=True,
+            row_spacing=10
+            )
+        return app_grid
+
+    def create_label(self,label_title):
+        new_label = Gtk.Label(
+            label=label_title
+            )
+        return new_label
+
+
+    def create_drop_down(self):
+        stringlist = Gtk.StringList()
+        drop_down = Gtk.DropDown(
+            model = stringlist,
+            show_arrow = True
+            )
+        # Obatain a list of all the devices
+        devices_list = self.create_device_list()
+        # Go through the list and add the devices to the stringlist
+        for device in devices_list:
+            stringlist.append(device.get_display_name())
+
+        return drop_down
+
+
+    def create_button(self,new_label):
+        toggle_button = Gtk.ToggleButton(
+            label = new_label
+            )
+        return toggle_button
+
+
+    def toggle_start(self,start_button):
+        if(start_button.get_active()):
+            device_path = self.get_device_path(start_button.devices[start_button.drop_down.get_selected()])
+            # Build the pipeline
+            self.pipeline = self.create_pipeline(device_path)
+            # Start the player
+            self.pipeline.set_state(4)
+            # Freeze the drop down when active
+            start_button.drop_down.set_sensitive(False)
+
+
+
+    def toggle_stop(self,stop_button):
+        if(stop_button.get_active()):
+            self.pipeline.set_state(1)
+            stop_button.drop_down.set_sensitive(True)
+
+
+    def create_device_list(self):
+        device_monitor = Gst.DeviceMonitor()
+        # Filter for video capture device
+        device_monitor.add_filter(None,Gst.Caps.from_string("video/x-raw"))
+        # Start the monitoring
+        device_monitor.start()
+        # Create an array with the devices
+        devices = device_monitor.get_devices()
+        # Stop the monitoring
+        device_monitor.stop()
+        #Return teh arrays
+        return devices
+
+    def get_device_path(self,device):
+        device_path = device.get_properties().get_value('api.v4l2.path')
+        return device_path
+
+    def get_device_name(self,name):
+        device_name = device.get_properties().get_value('api.v4l2.cap.card')
+        return device_name
+
+    def create_pipeline(self,device_path):
+        # Create the pipeline
+        pipeline = Gst.Pipeline.new('App Pipeline')
+        # Create the source for the pipeline
+        src = Gst.ElementFactory.make('v4l2src', 'source')
+        # Set the device path to the src
+        src.set_property('device', device_path)
+        # Add the source to the pipeline
+        pipeline.add(src)
+        # Create the conveter
+        converter = Gst.ElementFactory.make('jpegdec', 'converter')
+        # Add the converter to the pipeline
+        pipeline.add(converter)
+        # Create the sink
+        sink = Gst.ElementFactory.make('autovideosink', 'sink')
+        #  Add the sink to the pipeline
+        pipeline.add(sink)
+        #  Link the elements together
+        src.link(converter)
+        converter.link(sink)
+        # Return the pipeline
+        return pipeline
+
+####### End of class video_capture_card #######
+
+# Main Function
+def main():
+
+    # Create the application
+    app = Gtk.Application(application_id="org.capture_card_app.local")
+
+    # Initiased Gst
+    Gst.init(None)
+
+    # Create a empty pipeline
+    pipeline = None
+
+    # Use the class blueprint and pass the app to it
+    capture_card_window = video_capture_card(app,pipeline)
+
+    # When the app.run is called it will excute a function from the class
+    # App get passed automatically to the function
+    app.connect("activate",capture_card_window.create_window)
+
+    # Run the application
+    app.run()
+
+# Call the main function
+main()
+
+

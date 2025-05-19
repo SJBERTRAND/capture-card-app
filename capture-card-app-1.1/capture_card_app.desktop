@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Icon=capture-card-app
+Name=Capture Card App
+Comment=Capture Card App
+Categories=Utilities
+Exec=capture_card_app
+StartupNotify=True
+Terminal=False

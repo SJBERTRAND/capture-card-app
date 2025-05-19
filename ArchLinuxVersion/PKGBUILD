@@ -1,0 +1,30 @@
+# Maintainer: Sly
+pkgname=capture_card_app
+pkgver=1.1
+pkgrel=1
+epoch=
+pkgdesc="Capture Card App"
+arch=(any)
+url=""
+license=('GPL')
+groups=()
+depends=()
+makedepends=()
+checkdepends=()
+package=()
+optdepends=()
+provides=()
+conflicts=()
+replaces=()
+backup=()
+options=()
+install=
+changelog=
+source=()
+noextract=()
+md5sums=()
+validpgpkeys=()
+
+package() {
+	cp -r usr/ "$pkgdir/"
+}

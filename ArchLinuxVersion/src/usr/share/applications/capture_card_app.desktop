@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Icon=/usr/share/icons/hicolor/256x256/apps/capture_card_app.png
+Name=Capture Card App
+Comment=Capture Card App
+Categories=Utilities
+Exec=capture_card_app
+StartupNotify=True
+Terminal=False
